@@ -11,6 +11,8 @@
 
 @interface HRYMyScene ()
 
+@property (nonatomic, strong) GCController *myController;
+
 @end
 
 @implementation HRYMyScene
@@ -58,9 +60,6 @@
     [center addObserver:self selector:@selector(gameControllerDidDisconnect:)
                    name:GCControllerDidDisconnectNotification object:nil];
 
-    // Configure all the currently connected game controllers.
-    [self p_configureConnectedGameControllers];
-
     // And start looking for any wireless controllers.
     [GCController startWirelessControllerDiscoveryWithCompletionHandler:^{
         NSLog(@"Finished finding controllers");
@@ -69,21 +68,53 @@
 
 #pragma mark - Private
 
-- (void)p_configureConnectedGameControllers {
-    for (GCController *controller in [GCController controllers]) {
-        NSLog(@"controller: %@", controller);
-    }
-}
-
 #pragma mark - Notification
 
 - (void)gameControllerDidConnect:(NSNotification *)notification {
     GCController *controller = notification.object;
     NSLog(@"Connected game controller: %@", controller);
+
+    self.myController = controller;
+
+    // Single-controller game
+    if (self.myController.playerIndex == GCControllerPlayerIndexUnset) {
+        self.myController.playerIndex = 0;
+    }
+
+    GCControllerButtonValueChangedHandler buttonHandler =
+    ^(GCControllerButtonInput *button, float value, BOOL pressed) {
+        NSLog(@"button value changed: %f", value);
+    };
+
+    GCGamepad *profile = self.myController.gamepad;
+    profile.buttonA.valueChangedHandler = buttonHandler;
+    profile.buttonB.valueChangedHandler = buttonHandler;
+    profile.buttonX.valueChangedHandler = buttonHandler;
+    profile.buttonY.valueChangedHandler = buttonHandler;
+    profile.leftShoulder.valueChangedHandler  = buttonHandler;
+    profile.rightShoulder.valueChangedHandler = buttonHandler;
+
+    GCControllerDirectionPadValueChangedHandler padMoveHandler =
+    ^(GCControllerDirectionPad *dpad, float xValue, float yValue) {
+        NSLog(@"Pad value changed: (%f, %f)", xValue, yValue);
+    };
+
+    profile.dpad.valueChangedHandler = padMoveHandler;
+
+    if (self.myController.extendedGamepad) {
+        GCExtendedGamepad *extendedProfile = self.myController.extendedGamepad;
+
+        extendedProfile.leftTrigger.valueChangedHandler  = buttonHandler;
+        extendedProfile.rightTrigger.valueChangedHandler = buttonHandler;
+        extendedProfile.leftThumbstick.valueChangedHandler  = padMoveHandler;
+        extendedProfile.rightThumbstick.valueChangedHandler = padMoveHandler;
+    }
 }
 
 - (void)gameControllerDidDisconnect:(NSNotification *)notification {
     GCController *controller = notification.object;
+    self.myController = nil;
+
     NSLog(@"Disconnected game controller: %@", controller);
 }
 
